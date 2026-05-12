@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      font-size: 13px;
+      color: #202124;
+      background: #fff;
+    }
+
+    /* ── Search bar ── */
+    .search-row {
+      display: flex;
+      gap: 6px;
+      padding: 12px 12px 0;
+    }
+
+    #wordInput {
+      flex: 1;
+      height: 32px;
+      padding: 0 10px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    #wordInput:focus { border-color: #1a73e8; }
+
+    #lookupBtn {
+      height: 32px;
+      padding: 0 14px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #lookupBtn:hover { background: #1765cc; }
+    #lookupBtn:disabled { background: #9aa0a6; cursor: default; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e0e0e0;
+      margin: 10px 12px 0;
+      gap: 0;
+    }
+
+    .tab {
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #5f6368;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      user-select: none;
+    }
+    .tab:hover { color: #1a73e8; }
+    .tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+
+    /* ── Status messages ── */
+    #status {
+      padding: 10px 12px 0;
+      font-size: 12px;
+      color: #5f6368;
+      min-height: 22px;
+    }
+    #status.error { color: #c5221f; }
+    #status.info  { color: #188038; }
+
+    /* ── Results ── */
+    #results {
+      padding: 6px 12px 12px;
+      overflow-y: auto;
+      max-height: calc(100vh - 120px);
+    }
+
+    /* ── TOC ── */
+    .toc {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 7px 10px;
+      margin-top: 8px;
+      margin-bottom: 4px;
+    }
+    .toc-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #9aa0a6;
+      margin-bottom: 5px;
+    }
+    .toc-entry {
+      display: block;
+      font-size: 12px;
+      color: #1a73e8;
+      cursor: pointer;
+      padding: 2px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-decoration: none;
+    }
+    .toc-entry:hover { text-decoration: underline; }
+    .toc-pos {
+      font-weight: 600;
+      color: #5f6368;
+    }
+
+    .pos-section { margin-top: 16px; }
+
+    .pos-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #9aa0a6;
+      margin-bottom: 2px;
+    }
+
+    .pos-desc {
+      font-size: 11.5px;
+      color: #5f6368;
+      font-style: italic;
+      margin-bottom: 7px;
+    }
+
+    .word-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .word-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px 3px 10px;
+      background: #f1f3f4;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: background .12s, border-color .12s;
+      user-select: none;
+    }
+    .word-chip:hover {
+      background: #e8f0fe;
+      border-color: #aecbfa;
+      color: #1a73e8;
+    }
+    .chip-insert {
+      font-size: 10px;
+      opacity: 0;
+      color: #1a73e8;
+      border-left: 1px solid #aecbfa;
+      padding-left: 4px;
+      transition: opacity .12s;
+      line-height: 1;
+    }
+    .word-chip:hover .chip-insert { opacity: 1; }
+
+    .sentences-list { list-style: none; }
+    .sentences-list li {
+      padding: 7px 0;
+      border-bottom: 1px solid #f1f3f4;
+      line-height: 1.5;
+      font-size: 12.5px;
+      color: #3c4043;
+    }
+    .sentences-list li:last-child { border-bottom: none; }
+
+    .empty {
+      color: #9aa0a6;
+      font-size: 12px;
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #323232;
+      color: #fff;
+      padding: 7px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="search-row">
+    <input id="wordInput" type="text" placeholder="Look up a word…" autocomplete="off" spellcheck="false">
+    <button id="lookupBtn">Look up</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="synonyms">Synonyms</div>
+    <div class="tab" data-tab="antonyms">Antonyms</div>
+    <div class="tab" data-tab="sentences">Examples</div>
+  </div>
+
+  <div id="status"></div>
+  <div id="results"><p class="empty">Select a word in your document or type one above.</p></div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentTab = 'synonyms';
+    let cache = {};  // { "word:tab": result }
+
+    // ── Init: try to load selected word ──────────────────────────────────────
+
+    google.script.run
+      .withSuccessHandler(word => {
+        if (word) {
+          document.getElementById('wordInput').value = word;
+          lookup(word);
+        }
+      })
+      .withFailureHandler(() => {})
+      .getSelectedWord();
+
+    // ── Events ───────────────────────────────────────────────────────────────
+
+    document.getElementById('lookupBtn').addEventListener('click', () => {
+      const word = document.getElementById('wordInput').value.trim();
+      if (word) lookup(word);
+    });
+
+    document.getElementById('wordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const word = document.getElementById('wordInput').value.trim();
+        if (word) lookup(word);
+      }
+    });
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        const word = document.getElementById('wordInput').value.trim();
+        if (word) lookup(word);
+      });
+    });
+
+    // ── Core lookup ──────────────────────────────────────────────────────────
+
+    function lookup(word) {
+      const key = word.toLowerCase() + ':' + currentTab;
+      if (cache[key]) {
+        render(cache[key]);
+        return;
+      }
+
+      setStatus('Looking up "' + word + '"…');
+      setLoading(true);
+
+      google.script.run
+        .withSuccessHandler(result => {
+          cache[key] = result;
+          setLoading(false);
+          render(result);
+        })
+        .withFailureHandler(err => {
+          setLoading(false);
+          setStatus('Error: ' + (err.message || 'Unknown error'), 'error');
+          document.getElementById('results').innerHTML = '';
+        })
+        .fetchThesaurus(word, currentTab);
+    }
+
+    // ── Render results ────────────────────────────────────────────────────────
+
+    function render(result) {
+      const container = document.getElementById('results');
+
+      if (result.error) {
+        setStatus((result._debug ? result._debug + ' | ' : '') + result.error, 'error');
+        container.innerHTML = '';
+        return;
+      }
+
+      setStatus('');
+
+      if (result.sentences) {
+        if (!result.sentences.length) {
+          container.innerHTML = '<p class="empty">No example sentences found.</p>';
+          return;
+        }
+        const ul = document.createElement('ul');
+        ul.className = 'sentences-list';
+        result.sentences.forEach(s => {
+          const li = document.createElement('li');
+          li.textContent = s;
+          ul.appendChild(li);
+        });
+        container.innerHTML = '';
+        container.appendChild(ul);
+        return;
+      }
+
+      if (!result.sections || !result.sections.length) {
+        container.innerHTML = '<p class="empty">No results found.</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+
+      // Build TOC
+      const toc = document.createElement('div');
+      toc.className = 'toc';
+      const tocTitle = document.createElement('div');
+      tocTitle.className = 'toc-title';
+      tocTitle.textContent = 'Jump to meaning';
+      toc.appendChild(tocTitle);
+      result.sections.forEach((section, i) => {
+        const entry = document.createElement('a');
+        entry.className = 'toc-entry';
+        entry.title = section.desc || section.pos;
+        const posSpan = document.createElement('span');
+        posSpan.className = 'toc-pos';
+        posSpan.textContent = section.pos ? section.pos + (section.desc ? ' — ' : '') : '';
+        entry.appendChild(posSpan);
+        entry.appendChild(document.createTextNode(section.desc || ''));
+        entry.addEventListener('click', () => {
+          document.getElementById('section-' + i).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        toc.appendChild(entry);
+      });
+      container.appendChild(toc);
+
+      result.sections.forEach((section, i) => {
+        const div = document.createElement('div');
+        div.className = 'pos-section';
+        div.id = 'section-' + i;
+
+        if (section.pos) {
+          const label = document.createElement('div');
+          label.className = 'pos-label';
+          label.textContent = section.pos;
+          div.appendChild(label);
+        }
+
+        if (section.desc) {
+          const desc = document.createElement('div');
+          desc.className = 'pos-desc';
+          desc.textContent = section.desc;
+          div.appendChild(desc);
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'word-grid';
+
+        section.words.forEach(word => {
+          const chip = document.createElement('span');
+          chip.className = 'word-chip';
+          chip.title = 'Click to look up · Insert button to replace selection';
+
+          const label = document.createElement('span');
+          label.textContent = word;
+          chip.appendChild(label);
+
+          const insert = document.createElement('span');
+          insert.className = 'chip-insert';
+          insert.textContent = 'insert';
+          insert.title = 'Replace selected text with this word';
+          insert.addEventListener('click', e => { e.stopPropagation(); replaceWord(word); });
+          chip.appendChild(insert);
+
+          chip.addEventListener('click', () => {
+            document.getElementById('wordInput').value = word;
+            lookup(word);
+          });
+          grid.appendChild(chip);
+        });
+
+        div.appendChild(grid);
+        container.appendChild(div);
+      });
+    }
+
+    // ── Replace word in doc ──────────────────────────────────────────────────
+
+    function replaceWord(word) {
+      google.script.run
+        .withSuccessHandler(result => {
+          if (result.success) {
+            showToast('Replaced with "' + word + '"');
+          } else {
+            showToast(result.error || 'Could not replace — select text first.');
+          }
+        })
+        .withFailureHandler(err => {
+          showToast('Error: ' + (err.message || 'Unknown'));
+        })
+        .replaceSelectedWord(word);
+    }
+
+    // ── UI helpers ────────────────────────────────────────────────────────────
+
+    function setStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = type || '';
+    }
+
+    function setLoading(on) {
+      document.getElementById('lookupBtn').disabled = on;
+      document.getElementById('wordInput').disabled = on;
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+  </script>
+</body>
+</html>
