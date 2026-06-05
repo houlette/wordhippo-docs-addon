@@ -282,8 +282,15 @@
         })
         .withFailureHandler(err => {
           setLoading(false);
-          setStatus('Error: ' + (err.message || 'Unknown error'), 'error');
-          document.getElementById('results').innerHTML = '';
+          const msg = err.message || '';
+          if (msg.includes('PERMISSION_DENIED') || msg.includes('Authorization') || msg.includes('auth')) {
+            document.getElementById('results').innerHTML =
+              '<p class="empty">Session expired — please reload the document and reopen the sidebar.</p>';
+            setStatus('');
+          } else {
+            setStatus('Error: ' + (msg || 'Unknown error'), 'error');
+            document.getElementById('results').innerHTML = '';
+          }
         })
         .fetchThesaurus(word, currentTab);
     }
