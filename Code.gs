@@ -56,23 +56,12 @@ const WORDHIPPO_URLS = {
 
 function fetchThesaurus(word, type) {
   const slug = encodeURIComponent(word.toLowerCase().trim().replace(/\s+/g, '-'));
-  const cacheKey = 'wh:' + slug + ':' + type;
-
-  // Check server-side cache first — avoids re-fetching the same word and
-  // burning the UrlFetchApp bandwidth quota (~580KB per WordHippo page).
-  // Wrapped in try/catch because re-authentication can invalidate the cache
-  // session and throw PERMISSION_DENIED.
-  let cache;
-  try {
-    cache = CacheService.getUserCache();
-    const cached = cache.get(cacheKey);
-    if (cached) return JSON.parse(cached);
-  } catch (e) {
-    cache = null;
-  }
-
   const urlFn = WORDHIPPO_URLS[type] || WORDHIPPO_URLS.synonyms;
   const url = urlFn(slug);
+
+  // Note: CacheService.getUserCache() was removed because it throws an
+  // uncatchable PERMISSION_DENIED ScriptError after re-login. The sidebar's
+  // in-memory cache handles repeat lookups within a single session.
 
   let response;
   try {
@@ -93,14 +82,8 @@ function fetchThesaurus(word, type) {
   if (code !== 200) return { error: `WordHippo returned status ${code}.` };
 
   const html = response.getContentText();
-  const result = (type === 'sentences') ? parseSentences(html, word) : parseSynonymPage(html);
-
-  // Cache successes for 6 hours (21600s). Skip errors and results too large to store.
-  if (!result.error && cache) {
-    try { cache.put(cacheKey, JSON.stringify(result), 21600); } catch (e) {}
-  }
-
-  return result;
+  if (type === 'sentences') return parseSentences(html, word);
+  return parseSynonymPage(html);
 }
 
 // ─── HTML Parsers ─────────────────────────────────────────────────────────────
