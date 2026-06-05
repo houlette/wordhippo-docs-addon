@@ -60,9 +60,16 @@ function fetchThesaurus(word, type) {
 
   // Check server-side cache first — avoids re-fetching the same word and
   // burning the UrlFetchApp bandwidth quota (~580KB per WordHippo page).
-  const cache = CacheService.getUserCache();
-  const cached = cache.get(cacheKey);
-  if (cached) return JSON.parse(cached);
+  // Wrapped in try/catch because re-authentication can invalidate the cache
+  // session and throw PERMISSION_DENIED.
+  let cache;
+  try {
+    cache = CacheService.getUserCache();
+    const cached = cache.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (e) {
+    cache = null;
+  }
 
   const urlFn = WORDHIPPO_URLS[type] || WORDHIPPO_URLS.synonyms;
   const url = urlFn(slug);
@@ -89,7 +96,7 @@ function fetchThesaurus(word, type) {
   const result = (type === 'sentences') ? parseSentences(html, word) : parseSynonymPage(html);
 
   // Cache successes for 6 hours (21600s). Skip errors and results too large to store.
-  if (!result.error) {
+  if (!result.error && cache) {
     try { cache.put(cacheKey, JSON.stringify(result), 21600); } catch (e) {}
   }
 
