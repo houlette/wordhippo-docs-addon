@@ -285,7 +285,11 @@
           const msg = err.message || '';
           if (msg.includes('PERMISSION_DENIED') || msg.includes('Authorization') || msg.includes('auth')) {
             document.getElementById('results').innerHTML =
-              '<p class="empty">Session expired — please reload the document and reopen the sidebar.</p>';
+              '<p class="empty">Session expired. To reauthorize:<br><br>' +
+              '1. Click <b>Extensions → Apps Script</b><br>' +
+              '2. Click <b>Run</b> on any function<br>' +
+              '3. Accept the permissions dialog<br>' +
+              '4. Return here and reload the document</p>';
             setStatus('');
           } else {
             setStatus('Error: ' + (msg || 'Unknown error'), 'error');
